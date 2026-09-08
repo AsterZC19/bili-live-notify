@@ -33,15 +33,7 @@ git push origin v0.1.0
 
 GHCR 镜像地址为 `ghcr.io/asterzc19/bili-live-notify`，版本标签还会生成 `latest`（版本标签触发时）、对应的主次版本、主版本和 `sha-<commit>` 标签。手动运行生成 `edge` 和 `sha-<commit>` 标签。
 
-需要发布到 Docker Hub 时，在仓库的 Settings → Secrets and variables → Actions 中配置：
-
-| 名称 | 类型 | 内容 |
-| --- | --- | --- |
-| `DOCKERHUB_IMAGE` | Repository variable | 完整镜像名，例如 `AsterZC19/bili-live-notify` |
-| `DOCKERHUB_USERNAME` | Repository secret | Docker Hub 用户名 |
-| `DOCKERHUB_TOKEN` | Repository secret | Docker Hub Access Token（建议只授予该仓库 Read & Write） |
-
-配置后，推送版本标签会自动同时发布到 Docker Hub；从 Actions 手动运行时需要勾选“同时发布到 Docker Hub”。未配置 Docker Hub 时，GHCR 发布不受影响。Docker Hub 仓库需要事先创建，镜像名中的命名空间必须属于该账号。工作流还会发布 SBOM 和最大模式的构建来源证明。
+工作流还会发布 SBOM 和最大模式的构建来源证明。
 
 镜像发布工作流位于 `.github/workflows/publish-image.yml`。提交消息遵循 Conventional Commits，中文写法和类型说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
@@ -184,7 +176,7 @@ node --env-file=.env dist/main.js
 
 测试使用模拟接口、可控时间和临时 SQLite，不需要真实 Token，不向真实聊天发送消息。覆盖状态机、历史记录、事务回滚、重启、独立投递、关键帧降级、账号授权、代理与配置验证。50 主播测试输出进程 RSS、CPU 和检测耗时；这是本地测试数据，不是容器资源承诺。
 
-仓库附带 GitHub Actions：检查工作流执行类型检查、测试、构建和双架构 Docker 构建；版本标签发布工作流负责将镜像推送到 GHCR，并可按配置同步到 Docker Hub。也可手动验证双架构：
+仓库附带 GitHub Actions：检查工作流执行类型检查、测试、构建和双架构 Docker 构建；版本标签发布工作流负责将镜像推送到 GHCR。也可手动验证双架构：
 
 ```sh
 docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=bili-live-notify.tar .

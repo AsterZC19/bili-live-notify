@@ -27,7 +27,7 @@
 ```text
 feat(bot): 增加直播间分区显示
 fix(state): 修复短暂断流被记录为下播
-docs: 补充 Docker Hub 发布说明
+docs: 补充 GHCR 发布说明
 ci: 增加 GHCR 多架构镜像发布流程
 ```
 
