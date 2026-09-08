@@ -1,6 +1,15 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { RemoteError, type Message } from './model.js';
 export { delay };
+export const retryDelay = (attempt: number, base = 2000, cap = 60_000) =>
+  Math.min(cap, base * 2 ** Math.min(attempt, 8));
+export async function repeat(operation: () => Promise<void> | void, interval: number, signal: AbortSignal) {
+  while (!signal.aborted) {
+    const started = Date.now();
+    await operation();
+    await delay(Math.max(100, interval - (Date.now() - started)), undefined, { signal }).catch(() => {});
+  }
+}
 export function safeError(error: unknown): string {
   let message = error instanceof Error ? error.message : '未知错误';
   for (const [key, value] of Object.entries(process.env)) {

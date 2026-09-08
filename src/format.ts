@@ -4,11 +4,18 @@ export const duration = (seconds: number) => {
   return `${Math.floor(s / 3600)}小时${Math.floor(s % 3600 / 60)}分${s % 60}秒`;
 };
 export const clip = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+const formatters = new Map<string, Intl.DateTimeFormat>();
 export function time(value: number | null, zone: string) {
-  return value === null ? '未知' : new Intl.DateTimeFormat('zh-CN', {
-    timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
-  }).format(value);
+  if (value === null) return '未知';
+  let formatter = formatters.get(zone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('zh-CN', {
+      timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    });
+    formatters.set(zone, formatter);
+  }
+  return formatter.format(value);
 }
 export function areaLabel(area: RoomArea | null | undefined): string {
   if (!area) return '未提供';
@@ -41,8 +48,8 @@ export function eventMessage(event: LiveEvent, zone: string): Message {
     text: `🔴 ${name} 开播了\n${clip(s.title, 250)}\n${areaText(s.area)}\n开播：${time(event.session.startedAt, zone)}` +
       (event.session.startSource === 'observed' ? '（估算）' : '') + `\n${url}`,
     image: s.keyframe ?? s.cover ?? undefined,
-    fallbackImage: s.keyframe ? s.cover ?? undefined : undefined, url,
+    fallbackImage: s.keyframe ? s.cover ?? undefined : undefined,
   };
-  if (event.kind === 'end') return { text: `⚫ ${name} 下播了\n${sessionText(event.session, zone)}\n${url}`, url };
-  return { text: `📝 ${name} 修改了标题\n原：${clip(event.oldTitle ?? '', 250)}\n新：${clip(event.newTitle ?? '', 250)}\n${areaText(s.area)}\n${url}`, url };
+  if (event.kind === 'end') return { text: `⚫ ${name} 下播了\n${sessionText(event.session, zone)}\n${url}` };
+  return { text: `📝 ${name} 修改了标题\n原：${clip(event.oldTitle ?? '', 250)}\n新：${clip(event.newTitle ?? '', 250)}\n${areaText(s.area)}\n${url}` };
 }

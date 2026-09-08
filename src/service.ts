@@ -1,7 +1,6 @@
 import { Bilibili, parseSource } from './bilibili.js';
 import { areaText, clip, duration, sessionText, time } from './format.js';
 import type { Message, Snapshot, Target } from './model.js';
-import { advance } from './state.js';
 import { Store } from './store.js';
 
 export const commandDescriptions: Record<string, string> = {
@@ -9,9 +8,9 @@ export const commandDescriptions: Record<string, string> = {
   live: '查看正在直播的主播', frame: '获取直播关键帧', history: '查看直播场次记录',
   status: '查看服务状态', test: '发送测试消息', help: '查看使用说明',
 };
+export const needsSource = (command: string) => ['subscribe', 'unsubscribe', 'frame', 'history'].includes(command);
 export interface Source { statuses(uids: string[], now?: number): Promise<Map<string, Snapshot>>; resolve(input: string): Promise<Snapshot> }
 export class Service {
-  lastPollAttempt = 0;
   lastPollSuccess = 0;
   lastPollError: string | null = null;
   readonly connections: Record<string, string> = {};
@@ -22,15 +21,13 @@ export class Service {
   async poll(now = Date.now()): Promise<void> {
     if (this.polling) return;
     this.polling = true;
-    this.lastPollAttempt = now;
     try {
-      const uids = this.store.states().map(s => s.uid);
+      const uids = this.store.monitoredUids();
       const snapshots = await this.bili.statuses(uids, now);
-      for (const uid of uids) {
+      this.store.applySnapshots(uids.flatMap(uid => {
         const snapshot = snapshots.get(uid);
-        if (!snapshot || !this.store.targets(uid).length) continue;
-        this.store.commit(advance(this.store.state(uid), snapshot, this.maxGapMs), this.timezone);
-      }
+        return snapshot ? [snapshot] : [];
+      }), this.timezone, this.maxGapMs);
       if (uids.length && !snapshots.size) throw new Error('主播状态缺失，已保留原状态');
       this.lastPollSuccess = now;
       this.lastPollError = snapshots.size < uids.length ? '部分主播状态缺失，已保留原状态' : null;
@@ -41,13 +38,15 @@ export class Service {
   }
   private async snapshot(input: string): Promise<Snapshot> {
     const parsed = parseSource(input);
-    const key = `${parsed.type}:${parsed.id}`;
     const uid = this.store.knownUid(parsed.type, parsed.id);
-    const cached = (uid ? this.store.state(uid)?.snapshot : null) ?? this.recent.get(key);
+    const key = uid ? `uid:${uid}` : `${parsed.type}:${parsed.id}`;
+    const stored = uid ? this.store.state(uid)?.snapshot : undefined;
+    const recent = this.recent.get(key);
+    const cached = stored && (!recent || stored.observedAt >= recent.observedAt) ? stored : recent;
     if (cached && Date.now() - cached.observedAt <= 10_000) return cached;
     const existing = this.onDemand.get(key);
     if (existing) return existing;
-    const promise = this.bili.resolve(input).then(s => {
+    const promise = this.bili.resolve(uid ? `uid:${uid}` : input).then(s => {
       if (this.recent.size >= 100) this.recent.delete(this.recent.keys().next().value!);
       this.recent.set(key, s); return s;
     }).finally(() => { this.onDemand.delete(key); });
@@ -59,7 +58,7 @@ export class Service {
     return this.store.knownUid(parsed.type, parsed.id) ?? (await this.snapshot(input)).uid;
   }
   async command(target: Target, command: string, source = '', page = 1): Promise<Message[]> {
-    if (['subscribe', 'unsubscribe', 'frame', 'history'].includes(command) && !source) {
+    if (needsSource(command) && !source) {
       return [{ text: `用法：/${command} <直播间链接、房间号或 uid:数字>${command === 'history' ? ' [页码]' : ''}` }];
     }
     switch (command) {
@@ -89,7 +88,7 @@ export class Service {
         if (!s.live) return [{ text: `${clip(s.name, 100)} 当前未直播。` }];
         if (!s.keyframe) return [{ text: `${clip(s.name, 100)} 正在直播，但 Bilibili 暂未提供关键帧。` }];
         return [{ text: `${clip(s.name, 100)} 的直播关键帧\n${clip(s.title, 250)}\n${areaText(s.area)}\n查询时间：${time(s.observedAt, this.timezone)}\n画面由 Bilibili 更新，可能有延迟。\nhttps://live.bilibili.com/${s.roomId}`,
-          image: s.keyframe, url: `https://live.bilibili.com/${s.roomId}` }];
+          image: s.keyframe }];
       }
       case 'history': {
         if (!Number.isSafeInteger(page) || page < 1 || page > 100000) return [{ text: '页码必须是 1～100000 的整数' }];
@@ -98,7 +97,7 @@ export class Service {
         // Separate records avoid Telegram's text and Discord's embed limits.
         return sessions.map((s, i) => ({ text: `第 ${page} 页 · ${(page - 1) * 10 + i + 1}\n${clip(s.name, 100)} · ${clip(s.initialTitle, 180)}\n${sessionText(s, this.timezone)}` }));
       }
-      case 'status': return [{ text: `监测主播：${this.store.states().length}\n最后成功检测：${time(this.lastPollSuccess || null, this.timezone)}\n` +
+      case 'status': return [{ text: `监测主播：${this.store.monitoredUids().length}\n最后成功检测：${time(this.lastPollSuccess || null, this.timezone)}\n` +
         `检测状态：${this.lastPollError ?? '正常'}\n${Object.entries(this.connections).map(([p, s]) => `${p}：${s}`).join('\n')}\n投递：${this.store.deliveryStats()}\n显示时区：${this.timezone}` }];
       case 'test': return [{ text: '✅ 测试成功，当前聊天可以接收直播通知。' }];
       default: return [{ text: Object.entries(commandDescriptions).map(([k, v]) => `/${k} — ${v}`).join('\n') +

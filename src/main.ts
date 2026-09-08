@@ -5,7 +5,7 @@ import { Deliverer } from './delivery.js';
 import { closeNetwork, configureGatewayProxy } from './network.js';
 import { Service } from './service.js';
 import { Store } from './store.js';
-import { delay, log, safeError } from './util.js';
+import { delay, log, repeat, retryDelay, safeError } from './util.js';
 
 async function main() {
   const settings = config();
@@ -52,29 +52,22 @@ async function main() {
   })();
   process.once('SIGINT', () => { void stop(); });
   process.once('SIGTERM', () => { void stop(); });
-  const loop = (operation: () => Promise<void> | void, interval: number) => (async () => {
-    while (!signal.aborted) {
-      const started = Date.now();
-      await operation();
-      await delay(Math.max(100, interval - (Date.now() - started)), undefined, { signal }).catch(() => {});
-    }
-  })();
   let failures = 0;
   tasks.push((async () => {
     while (!signal.aborted) {
       const started = Date.now();
       try { await service.poll(); failures = 0; }
       catch (error) { failures++; log('poll_error', { error: safeError(error) }); }
-      const wait = failures ? Math.min(300_000, settings.pollMs * 2 ** Math.min(failures, 8)) : settings.pollMs;
+      const wait = failures ? retryDelay(failures, settings.pollMs, 300_000) : settings.pollMs;
       await delay(Math.max(100, wait - (Date.now() - started)), undefined, { signal }).catch(() => {});
     }
   })());
-  tasks.push(loop(() => deliverer.tick(), 1000));
-  tasks.push(loop(() => {
+  tasks.push(...deliverer.loops(signal));
+  tasks.push(repeat(() => {
     if (!store.lease(owner)) throw new Error('失去数据库实例租约');
     heartbeat = Date.now();
-  }, 2000));
-  tasks.push(loop(() => store.cleanup(Date.now()), 3600_000));
+  }, 2000, signal));
+  tasks.push(repeat(() => store.cleanup(Date.now()), 3600_000, signal));
   if (telegram) tasks.push(telegram.run());
   if (discord) tasks.push(discord.run());
   for (const task of tasks) void task.catch(error => {

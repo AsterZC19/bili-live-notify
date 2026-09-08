@@ -68,8 +68,8 @@ export class Bilibili {
     let result: { code?: number; data?: unknown };
     try { result = await response.json() as typeof result; }
     catch { throw new RemoteError('Bilibili 返回无效 JSON'); }
-    if (result.code !== 0 || !result.data || typeof result.data !== 'object') {
-      throw new RemoteError(`Bilibili 接口异常：${result.code ?? '无状态码'}`);
+    if (!result || result.code !== 0 || !result.data || typeof result.data !== 'object') {
+      throw new RemoteError(`Bilibili 接口异常：${result?.code ?? '无状态码'}`);
     }
     return result.data as Record<string, unknown>;
   }

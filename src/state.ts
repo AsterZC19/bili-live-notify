@@ -56,7 +56,7 @@ export function advance(previous: RoomState | null, input: Snapshot, maxGapMs = 
         snapshot.startedAt > state.session.upstreamStart;
       if (expiredRecovery || (changedStart && !shortRecovery)) {
         // The upstream start time proves a new session, but cannot tell us when the old one ended.
-        finish(!expiredRecovery || gap || state.session.firstOfflineAt === null, expiredRecovery);
+        finish(!expiredRecovery || gap || state.session.endSource === 'unknown' || state.session.firstOfflineAt === null, expiredRecovery);
         start(true);
       } else {
         if (gap) state.session.interrupted = true;

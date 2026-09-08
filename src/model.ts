@@ -32,10 +32,10 @@ export interface LiveEvent {
   kind: 'start' | 'end' | 'title'; snapshot: Snapshot; session: Session;
   oldTitle?: string; newTitle?: string;
 }
-export interface Message { text: string; image?: string; fallbackImage?: string; url?: string }
+export interface Message { text: string; image?: string; fallbackImage?: string }
 export interface Delivery {
   id: number; target: Target; uid: string; message: Message;
-  createdAt: number; attempts: number;
+  attempts: number;
 }
 export class RemoteError extends Error {
   constructor(message: string, public retryAfterMs?: number, public permanent = false,

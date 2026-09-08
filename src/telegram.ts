@@ -3,7 +3,7 @@ import { clip } from './format.js';
 import { RemoteError, type Message, type Sender } from './model.js';
 import { request } from './network.js';
 import { commandDescriptions, Service } from './service.js';
-import { delay, log, mediaFallback, safeError, SerialTargets } from './util.js';
+import { delay, log, mediaFallback, retryDelay, safeError, SerialTargets } from './util.js';
 
 interface Update {
   update_id: number;
@@ -31,17 +31,17 @@ export class Telegram implements Sender {
     let result: { ok?: boolean; result?: T; error_code?: number; description?: string; parameters?: { retry_after?: number } };
     try { result = await response.json() as typeof result; }
     catch { throw new RemoteError(`Telegram 返回无效响应（HTTP ${response.status}）`); }
-    if (!result.ok) {
-      const code = result.error_code ?? response.status;
-      const media = code === 400 && /photo|image|file|HTTP URL|WEBPAGE|MEDIA/i.test(result.description ?? '');
-      throw new RemoteError(`Telegram API 错误 ${code}`, result.parameters?.retry_after
+    if (!result || typeof result !== 'object' || !response.ok || !result.ok) {
+      const code = result?.error_code ?? response.status;
+      const media = code === 400 && /photo|image|file|HTTP URL|WEBPAGE|MEDIA/i.test(result?.description ?? '');
+      throw new RemoteError(`Telegram API 错误 ${code}`, result?.parameters?.retry_after
         ? result.parameters.retry_after * 1000 : undefined, [400, 401, 403, 404, 409].includes(code), media);
     }
     return result.result as T;
   }
   async send(targetId: string, message: Message): Promise<void> {
     return this.queue.run(targetId, async () => {
-      await delay(Math.max(0, 1100 - (Date.now() - (this.lastSend.get(targetId) ?? 0))));
+      await delay(Math.max(0, 1100 - (Date.now() - (this.lastSend.get(targetId) ?? 0))), undefined, { signal: this.abort.signal });
       try {
         await mediaFallback(message, async m => {
           if (m.image) await this.api('sendPhoto', { chat_id: targetId, photo: m.image, caption: clip(m.text, 1000) });
@@ -93,7 +93,7 @@ export class Telegram implements Sender {
         this.service.connections.telegram = safeError(error);
         log('telegram_error', { error: safeError(error) });
         const wait = error instanceof RemoteError && error.retryAfterMs ? error.retryAfterMs
-          : Math.min(60_000, 2000 * 2 ** Math.min(failures++, 5));
+          : retryDelay(failures++);
         await delay(wait, undefined, { signal: this.abort.signal }).catch(() => {});
       }
     }
