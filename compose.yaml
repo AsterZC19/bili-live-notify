@@ -1,0 +1,17 @@
+services:
+  notifier:
+    build: .
+    image: bili-live-notify:local
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    volumes:
+      - bili-data:/data
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  bili-data:
