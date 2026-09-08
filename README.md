@@ -22,6 +22,29 @@ docker compose logs -f --tail=100
 
 Telegram 中向 Bot 私聊发送 `/subscribe 6`；Discord 中在指定服务器的普通文字频道执行 `/subscribe source:6`。两端列表独立，向哪一个聊天订阅就通知到哪里。
 
+## 自动发布容器镜像
+
+GitHub Actions 会在推送符合 `vX.Y.Z` 的版本标签时构建 `linux/amd64` 和 `linux/arm64` 镜像，并发布到 GHCR；手动运行工作流时会发布 `edge` 和当前提交 SHA 标签。GHCR 使用 GitHub Actions 自带的 `GITHUB_TOKEN`，不需要额外配置。第一次发布后，可以在 GitHub Package 设置中按需将包改为公开。
+
+```sh
+git tag -a v0.1.0 -m "chore(release): 发布 v0.1.0"
+git push origin v0.1.0
+```
+
+GHCR 镜像地址为 `ghcr.io/asterzc19/bili-live-notify`，版本标签还会生成 `latest`（版本标签触发时）、对应的主次版本、主版本和 `sha-<commit>` 标签。手动运行生成 `edge` 和 `sha-<commit>` 标签。
+
+需要发布到 Docker Hub 时，在仓库的 Settings → Secrets and variables → Actions 中配置：
+
+| 名称 | 类型 | 内容 |
+| --- | --- | --- |
+| `DOCKERHUB_IMAGE` | Repository variable | 完整镜像名，例如 `AsterZC19/bili-live-notify` |
+| `DOCKERHUB_USERNAME` | Repository secret | Docker Hub 用户名 |
+| `DOCKERHUB_TOKEN` | Repository secret | Docker Hub Access Token（建议只授予该仓库 Read & Write） |
+
+配置后，推送版本标签会自动同时发布到 Docker Hub；从 Actions 手动运行时需要勾选“同时发布到 Docker Hub”。未配置 Docker Hub 时，GHCR 发布不受影响。Docker Hub 仓库需要事先创建，镜像名中的命名空间必须属于该账号。工作流还会发布 SBOM 和最大模式的构建来源证明。
+
+镜像发布工作流位于 `.github/workflows/publish-image.yml`。提交消息遵循 Conventional Commits，中文写法和类型说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
 默认采用 Docker 命名卷 `bili-data`，无需手工调整目录权限。若改用宿主机目录挂载，需允许容器用户 UID/GID `1000:1000` 写入目录及 SQLite 的 WAL 文件。
 
 关闭任一平台时，将该平台的所有配置留空；至少启用一个平台。不要把 `.env` 提交到版本库。建议使用专门为本服务创建的 Bot / Discord Application。
@@ -161,7 +184,7 @@ node --env-file=.env dist/main.js
 
 测试使用模拟接口、可控时间和临时 SQLite，不需要真实 Token，不向真实聊天发送消息。覆盖状态机、历史记录、事务回滚、重启、独立投递、关键帧降级、账号授权、代理与配置验证。50 主播测试输出进程 RSS、CPU 和检测耗时；这是本地测试数据，不是容器资源承诺。
 
-仓库附带 GitHub Actions：类型检查、测试、构建，以及 `linux/amd64` / `linux/arm64` Docker 构建，不自动发布镜像。也可手动验证双架构：
+仓库附带 GitHub Actions：检查工作流执行类型检查、测试、构建和双架构 Docker 构建；版本标签发布工作流负责将镜像推送到 GHCR，并可按配置同步到 Docker Hub。也可手动验证双架构：
 
 ```sh
 docker buildx build --platform linux/amd64,linux/arm64 --output type=oci,dest=bili-live-notify.tar .
