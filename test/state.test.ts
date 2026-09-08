@@ -115,3 +115,12 @@ test('stale upstream start time cannot make a new session overlap a confirmed en
   r = advance(r.state, snap(60_000));
   assert.equal(r.state.session!.startedAt, T + 50_000);
 });
+test('sessions retain the initial category and expose a changed final category', () => {
+  let r = advance(null, snap(0));
+  const changed = { id: 9, name: '新分区', parentId: 10, parentName: '新父分区' };
+  r = advance(r.state, snap(10_000, { area: changed }));
+  assert.deepEqual(r.state.session!.initialArea, snap(0).area);
+  assert.deepEqual(r.state.session!.finalArea, changed);
+  assert.equal(r.sessions[0]!.finalArea!.name, '新分区');
+  assert.equal(r.events.length, 0);
+});

@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../src/store.js';
 import { Service, type Source } from '../src/service.js';
-import { imageUrl, parseSnapshot, parseSource, startTime } from '../src/bilibili.js';
+import { imageUrl, parseArea, parseSnapshot, parseSource, startTime } from '../src/bilibili.js';
+import { areaLabel, areaText, eventMessage, sessionText } from '../src/format.js';
 import { config } from '../src/config.js';
 import { telegramCommand } from '../src/telegram.js';
 import { discordAllowed, discordBody } from '../src/discord.js';
@@ -29,6 +30,16 @@ test('snapshots distinguish replay from live, validate missing fields and image 
   assert.equal(startTime(-62170012800, T), null);
   assert.equal(startTime(T / 1000 + 3600, T), null);
   assert.equal(startTime(T / 1000, T), T);
+  assert.deepEqual(parseArea({ area_name: '旧分区' }), { id: null, name: '旧分区', parentId: null, parentName: null });
+  assert.deepEqual(parseArea({ area_name: '旧分区', area_v2_name: '细分', area_v2_parent_name: '父分区', area_v2_id: '12', area_v2_parent_id: 3 }),
+    { id: 12, name: '细分', parentId: 3, parentName: '父分区' });
+  assert.deepEqual(parseArea({ area_name: '  ', area_v2_name: null, area_v2_id: -1 }),
+    { id: null, name: null, parentId: null, parentName: null });
+});
+test('area formatting handles parent/child names and missing legacy fields', () => {
+  assert.equal(areaLabel({ id: 2, name: '游戏', parentId: 1, parentName: '网游' }), '网游 / 游戏');
+  assert.equal(areaLabel({ id: 2, name: '生活', parentId: 1, parentName: '生活' }), '生活');
+  assert.equal(areaText(undefined), '分区：未提供');
 });
 test('frame command uses a recent snapshot and never substitutes a cover', async t => {
   const store = new Store(':memory:'); t.after(() => store.close());
@@ -42,10 +53,34 @@ test('frame command uses a recent snapshot and never substitutes a cover', async
   };
   const service = new Service(store, 'Asia/Shanghai', source);
   assert.equal((await service.command(target, 'frame', '200'))[0]?.image, s.keyframe);
+  assert.match((await service.command(target, 'frame', '200'))[0]!.text, /虚拟主播 \/ 虚拟日常/);
   assert.equal(calls, 0);
   store.db.prepare('UPDATE rooms SET state=? WHERE uid=?').run(JSON.stringify({ ...store.state('100'), snapshot: { ...s, keyframe: null } }), '100');
   const empty = (await service.command(target, 'frame', '200'))[0]!;
   assert.equal(empty.image, undefined); assert.match(empty.text, /暂未提供/);
+});
+test('list, history and event notifications include the room category', async t => {
+  const store = new Store(':memory:'); t.after(() => store.close());
+  const target = { platform: 'telegram' as const, id: '1' };
+  const s = snap(0);
+  store.subscribe(target, s);
+  let list = (await new Service(store, 'Asia/Shanghai').command(target, 'list'))[0]!;
+  assert.match(list.text, /分区：虚拟主播 \/ 虚拟日常/);
+  const live = await new Service(store, 'Asia/Shanghai').command(target, 'live');
+  assert.match(live[0]!.text, /分区：虚拟主播 \/ 虚拟日常/);
+  const event = eventMessage({ kind: 'start', snapshot: s, session: {
+    id: 'session', uid: s.uid, roomId: s.roomId, name: s.name, startedAt: s.startedAt!, startSource: 'api',
+    upstreamStart: s.startedAt, endedAt: null, durationSeconds: null, endSource: null,
+    firstObservedAt: s.observedAt, lastLiveAt: s.observedAt, firstOfflineAt: null,
+    initialTitle: s.title, finalTitle: s.title, initialArea: s.area, finalArea: s.area,
+    status: 'live', joinedLate: false, interrupted: false,
+  } }, 'Asia/Shanghai');
+  assert.match(event.text, /分区：虚拟主播 \/ 虚拟日常/);
+  assert.match(sessionText({
+    id: 'legacy', uid: '100', roomId: '200', name: '旧主播', startedAt: T, startSource: 'api', upstreamStart: T,
+    endedAt: null, durationSeconds: null, endSource: null, firstObservedAt: T, lastLiveAt: T, firstOfflineAt: null,
+    initialTitle: '旧标题', finalTitle: '旧标题', status: 'live', joinedLate: false, interrupted: false,
+  }, 'Asia/Shanghai'), /分区：未提供/);
 });
 test('stale frame data is refreshed and a now-offline room produces no image', async t => {
   const store = new Store(':memory:'); t.after(() => store.close());

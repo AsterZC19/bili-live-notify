@@ -14,10 +14,12 @@ test('Bilibili resolves a short room ID then reads its UID via the batch endpoin
     urls.push(url);
     return new Response(JSON.stringify({ code: 0, data: url.includes('room_init') ? { room_id: 7734200, uid: 50329118 }
       : { '50329118': { uid: 50329118, room_id: 7734200, uname: '主播', title: '直播', live_status: 1,
-        live_time: T / 1000, keyframe: 'https://i0.hdslb.com/a.jpg' } } }));
+        live_time: T / 1000, keyframe: 'https://i0.hdslb.com/a.jpg', area_name: '生活娱乐',
+        area_v2_id: 371, area_v2_name: '虚拟日常', area_v2_parent_id: 9, area_v2_parent_name: '虚拟主播' } } }));
   });
   const result = await bili.resolve('6');
   assert.equal(result.uid, '50329118'); assert.equal(result.roomId, '7734200');
+  assert.deepEqual(result.area, { id: 371, name: '虚拟日常', parentId: 9, parentName: '虚拟主播' });
   assert.equal(urls.length, 2);
   assert.match(urls[0]!, /room_init\?id=6$/);
   assert.equal(new URL(urls[1]!).searchParams.get('uids[]'), '50329118');

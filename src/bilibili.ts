@@ -1,5 +1,5 @@
 import { request } from './network.js';
-import { RemoteError, type Snapshot } from './model.js';
+import { RemoteError, type RoomArea, type Snapshot } from './model.js';
 
 const API = 'https://api.live.bilibili.com';
 export const imageUrl = (value: unknown): string | null => {
@@ -17,6 +17,21 @@ export function startTime(value: unknown, now: number): number | null {
   return Number.isFinite(seconds) && seconds > 946684800 && seconds * 1000 <= now + 60_000
     ? Math.floor(seconds * 1000) : null;
 }
+function areaId(value: unknown): number | null {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number > 0 ? number : null;
+}
+function areaName(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+export function parseArea(raw: Record<string, unknown>): RoomArea {
+  return {
+    id: areaId(raw.area_v2_id),
+    name: areaName(raw.area_v2_name) ?? areaName(raw.area_name),
+    parentId: areaId(raw.area_v2_parent_id),
+    parentName: areaName(raw.area_v2_parent_name),
+  };
+}
 export function parseSnapshot(uid: string, raw: unknown, now: number): Snapshot | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
@@ -25,7 +40,7 @@ export function parseSnapshot(uid: string, raw: unknown, now: number): Snapshot 
       typeof r.title !== 'string' || typeof r.uname !== 'string') return null;
   return { uid, roomId: String(r.room_id), name: r.uname, title: r.title,
     live: Number(r.live_status) === 1, startedAt: startTime(r.live_time, now),
-    keyframe: imageUrl(r.keyframe), cover: imageUrl(r.cover_from_user), observedAt: now };
+    keyframe: imageUrl(r.keyframe), cover: imageUrl(r.cover_from_user), area: parseArea(r), observedAt: now };
 }
 export function parseSource(input: string): { type: 'uid' | 'room'; id: string } {
   const value = input.trim();

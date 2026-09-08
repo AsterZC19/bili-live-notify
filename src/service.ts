@@ -1,5 +1,5 @@
 import { Bilibili, parseSource } from './bilibili.js';
-import { clip, duration, sessionText, time } from './format.js';
+import { areaText, clip, duration, sessionText, time } from './format.js';
 import type { Message, Snapshot, Target } from './model.js';
 import { advance } from './state.js';
 import { Store } from './store.js';
@@ -67,7 +67,7 @@ export class Service {
         const snapshot = await this.snapshot(source);
         const added = this.store.subscribe(target, snapshot);
         return [{ text: `${added ? '已订阅' : '已经订阅'} ${clip(snapshot.name, 100)}\n房间：${snapshot.roomId} / UID：${snapshot.uid}\n` +
-          (snapshot.live ? `正在直播：${clip(snapshot.title, 250)}` : '当前未直播') }];
+          `${areaText(snapshot.area)}\n` + (snapshot.live ? `正在直播：${clip(snapshot.title, 250)}` : '当前未直播') }];
       }
       case 'unsubscribe': return [{ text: this.store.unsubscribe(target, await this.uid(source)) ? '已取消订阅' : '当前聊天没有此订阅' }];
       case 'list': case 'live': {
@@ -78,6 +78,7 @@ export class Service {
           const live = s.snapshot.live;
           const start = s.session?.startedAt ?? s.snapshot.startedAt;
           return `${live ? '🔴' : '⚫'} ${clip(s.snapshot.name, 80)}（${s.snapshot.roomId}）\n` +
+            `${areaText(s.snapshot.area)}\n` +
             (live ? `${clip(s.snapshot.title, 120)}\n${start ? `开播：${time(start, this.timezone)} / 已播 ${duration((Date.now() - start) / 1000)}\n` : ''}` : '') +
             `状态查询：${time(s.snapshot.observedAt, this.timezone)}\nhttps://live.bilibili.com/${s.snapshot.roomId}`;
         }).join('\n\n') });
@@ -87,7 +88,7 @@ export class Service {
         const s = await this.snapshot(source);
         if (!s.live) return [{ text: `${clip(s.name, 100)} 当前未直播。` }];
         if (!s.keyframe) return [{ text: `${clip(s.name, 100)} 正在直播，但 Bilibili 暂未提供关键帧。` }];
-        return [{ text: `${clip(s.name, 100)} 的直播关键帧\n${clip(s.title, 250)}\n查询时间：${time(s.observedAt, this.timezone)}\n画面由 Bilibili 更新，可能有延迟。\nhttps://live.bilibili.com/${s.roomId}`,
+        return [{ text: `${clip(s.name, 100)} 的直播关键帧\n${clip(s.title, 250)}\n${areaText(s.area)}\n查询时间：${time(s.observedAt, this.timezone)}\n画面由 Bilibili 更新，可能有延迟。\nhttps://live.bilibili.com/${s.roomId}`,
           image: s.keyframe, url: `https://live.bilibili.com/${s.roomId}` }];
       }
       case 'history': {

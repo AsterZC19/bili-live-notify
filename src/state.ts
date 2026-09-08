@@ -25,6 +25,7 @@ export function advance(previous: RoomState | null, input: Snapshot, maxGapMs = 
       upstreamStart: validStart, endedAt: null, durationSeconds: null, endSource: null,
       firstObservedAt: now, lastLiveAt: now, firstOfflineAt: null,
       initialTitle: snapshot.title, finalTitle: snapshot.title, status: 'live',
+      initialArea: structuredClone(snapshot.area), finalArea: structuredClone(snapshot.area),
       joinedLate: !announce, interrupted: false,
     };
     state.live = true; state.offlineSince = null; state.titleCandidate = null;
@@ -69,6 +70,8 @@ export function advance(previous: RoomState | null, input: Snapshot, maxGapMs = 
         state.session.firstOfflineAt = null;
         state.session.lastLiveAt = now;
         state.session.endSource = null;
+        state.session.initialArea ??= structuredClone(snapshot.area);
+        state.session.finalArea = structuredClone(snapshot.area);
         if (snapshot.title === state.confirmedTitle) state.titleCandidate = null;
         else if (gap || state.titleCandidate?.value !== snapshot.title) {
           state.titleCandidate = { value: snapshot.title, since: now };

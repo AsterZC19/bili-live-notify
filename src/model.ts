@@ -1,8 +1,15 @@
 export type Platform = 'telegram' | 'discord';
 export interface Target { platform: Platform; id: string }
+export interface RoomArea {
+  id: number | null;
+  name: string | null;
+  parentId: number | null;
+  parentName: string | null;
+}
 export interface Snapshot {
   uid: string; roomId: string; name: string; title: string;
   live: boolean; startedAt: number | null; keyframe: string | null; cover: string | null;
+  area: RoomArea;
   observedAt: number;
 }
 export interface Session {
@@ -12,6 +19,7 @@ export interface Session {
   endSource: 'observed' | 'unknown' | null;
   firstObservedAt: number; lastLiveAt: number; firstOfflineAt: number | null;
   initialTitle: string; finalTitle: string;
+  initialArea?: RoomArea; finalArea?: RoomArea;
   status: 'live' | 'ended' | 'incomplete'; joinedLate: boolean; interrupted: boolean;
 }
 export interface RoomState {
