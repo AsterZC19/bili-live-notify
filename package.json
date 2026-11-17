@@ -8,7 +8,9 @@
   },
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -17,19 +19,19 @@
     "telegram-id": "node --env-file=.env dist/setup.js"
   },
   "dependencies": {
-    "@discordjs/core": "^2.6.0",
-    "@discordjs/rest": "^2.6.0",
+    "@discordjs/core": "^2.7.0",
+    "@discordjs/rest": "^2.6.3",
     "@discordjs/ws": "^2.0.4",
-    "better-sqlite3": "^13.0.3",
-    "https-proxy-agent": "^7.0.6",
-    "proxy-from-env": "^1.1.0",
-    "undici": "^6.27.0"
+    "better-sqlite3": "^13.2.0",
+    "https-proxy-agent": "^9.1.0",
+    "proxy-from-env": "^2.1.0",
+    "undici": "^6.29.1"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^24.0.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^24.19.2",
     "@types/proxy-from-env": "^1.0.4",
-    "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3"
   }
 }
