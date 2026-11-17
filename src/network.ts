@@ -11,10 +11,19 @@ export const dispatcher = new EnvHttpProxyAgent();
 type AgentWithRequest = https.Agent & { addRequest(req: ClientRequest, options: RequestOptions): void };
 const directAgent = https.globalAgent as AgentWithRequest;
 const proxyAgents = new Map<string, HttpsProxyAgent<string>>();
+function requestHost(options: RequestOptions): string {
+  if (options.hostname) {
+    return options.hostname.includes(':') && !options.hostname.startsWith('[')
+      ? `[${options.hostname}]` : options.hostname;
+  }
+  const host = options.host ?? 'localhost';
+  if (host.startsWith('[')) return host.replace(/\]:\d+$/, ']');
+  if (host.indexOf(':') !== host.lastIndexOf(':')) return `[${host}]`;
+  return host.replace(/:\d+$/, '');
+}
 class GatewayAgent extends https.Agent {
   addRequest(req: ClientRequest, options: RequestOptions): void {
-    const host = options.hostname ?? options.host ?? 'localhost';
-    const proxy = getProxyForUrl(`https://${host}:${options.port ?? 443}`);
+    const proxy = getProxyForUrl(`https://${requestHost(options)}:${options.port ?? 443}`);
     if (!proxy) { directAgent.addRequest(req, options); return; }
     let agent = proxyAgents.get(proxy);
     if (!agent) { agent = new HttpsProxyAgent(proxy); proxyAgents.set(proxy, agent); }
@@ -36,6 +45,7 @@ export async function request(url: string, options: {
 }
 export async function closeNetwork() {
   for (const agent of proxyAgents.values()) agent.destroy();
+  proxyAgents.clear();
   https.globalAgent.destroy(); https.globalAgent = directAgent;
   await dispatcher.close();
 }

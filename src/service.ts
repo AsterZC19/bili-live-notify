@@ -2,6 +2,7 @@ import { Bilibili, parseSource } from './bilibili.js';
 import { areaText, clip, duration, sessionText, time } from './format.js';
 import type { Message, Snapshot, Target } from './model.js';
 import { Store } from './store.js';
+import { safeError } from './util.js';
 
 export const commandDescriptions: Record<string, string> = {
   subscribe: '订阅主播到当前聊天', unsubscribe: '取消当前聊天的主播订阅', list: '查看订阅列表',
@@ -32,7 +33,7 @@ export class Service {
       this.lastPollSuccess = now;
       this.lastPollError = snapshots.size < uids.length ? '部分主播状态缺失，已保留原状态' : null;
     } catch (error) {
-      this.lastPollError = error instanceof Error ? error.message : '检测失败';
+      this.lastPollError = error instanceof Error ? safeError(error) : '检测失败';
       throw error;
     } finally { this.polling = false; }
   }

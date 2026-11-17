@@ -35,8 +35,9 @@ export function parseArea(raw: Record<string, unknown>): RoomArea {
 export function parseSnapshot(uid: string, raw: unknown, now: number): Snapshot | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  if (!/^[1-9]\d*$/.test(String(r.room_id)) || String(r.uid) !== uid ||
-      ![0, 1, 2].includes(Number(r.live_status)) || r.live_status == null ||
+  const liveStatusValid = (typeof r.live_status === 'number' || typeof r.live_status === 'string') &&
+    /^[012]$/.test(String(r.live_status));
+  if (!/^[1-9]\d*$/.test(String(r.room_id)) || String(r.uid) !== uid || !liveStatusValid ||
       typeof r.title !== 'string' || typeof r.uname !== 'string') return null;
   return { uid, roomId: String(r.room_id), name: r.uname, title: r.title,
     live: Number(r.live_status) === 1, startedAt: startTime(r.live_time, now),

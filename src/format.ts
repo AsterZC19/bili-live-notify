@@ -3,7 +3,13 @@ export const duration = (seconds: number) => {
   const s = Math.max(0, Math.floor(seconds));
   return `${Math.floor(s / 3600)}小时${Math.floor(s % 3600 / 60)}分${s % 60}秒`;
 };
-export const clip = (s: string, n: number) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+export function clip(s: string, n: number): string {
+  if (s.length <= n) return s;
+  let end = Math.max(0, n - 1);
+  const code = end > 0 ? s.charCodeAt(end - 1) : 0;
+  if (code >= 0xd800 && code <= 0xdbff) end--;
+  return s.slice(0, end) + '…';
+}
 const formatters = new Map<string, Intl.DateTimeFormat>();
 export function time(value: number | null, zone: string) {
   if (value === null) return '未知';

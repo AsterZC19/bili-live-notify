@@ -44,9 +44,11 @@ async function main() {
     log('stopping'); abort.abort(); telegram?.stop();
     const forced = setTimeout(() => { log('shutdown_timeout'); process.exit(1); }, 15_000);
     server.close();
+    server.closeIdleConnections();
     await discord?.stop().catch(() => {});
     await Promise.allSettled(tasks);
     store.release(owner); store.close();
+    server.closeAllConnections();
     await closeNetwork(); clearTimeout(forced);
     log('stopped');
   })();
